@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+    <name>SeedFinder</name>
+    <author>xormask</author>
+    <supportedVersions>
+        <li>1.3</li>
+    </supportedVersions>
+    <packageId>xormask.SeedFinder</packageId>
+    <description>Automatically find good, 100% vanilla compatible, seeds by searching for maps that meet a wide range of customizable criteria!
+
+This mod adds a new "Find Seeds" button in the upper-right corner of the "New colony / Choose scenario" window. Click this button to open up a set of filters that allow you to specify your desired map. For example, you can search for a mountainous tundra map, with a river, 6 steam geysers, and outlander and empire faction settlements within drop-pod range.
+
+The mod works by starting with a user-provided seed prefix (e.g. "MyPerfectWorld") and generating worlds with seeds "MyPerfectWorld1," "MyPerfectWorld2," and so on. For each world, SeedFinder searches all the tiles that match the filter criteria, and for each matching tile, a full-map screenshot is saved to disk (by-default in the RimworldSeedFinder subdirectory of your "My Pictures" folder).
+
+Generating worlds takes time, since SeedFinder simply calls into Rimworld's normal routines for procedurally generating the planet. Therefore, the mod can be configured to search for a desired number of matching tiles (100, by default) and is intended to be left running in the background until satisfactory seeds are found. After the mod finishes (or during the search), you can look through the generated screenshots and pick your desired map based on fine-grained details like fertile soil, mountain layout and Anima tree placement. Each saved screenshot is named with the world seed and latitude-longtitude coordinates of the matching tile, so once you pick a seed, simply enter it into the normal "Create world" generation screen, and find the matching tile based on world coordinates.
+
+Troubleshooting:
+    - SeedFinder isn't finding any seeds: first, try with a more relaxed set of search criteria (for example, flat temperate forest, with everything else left on defaults). This will ensure that SeedFinder is properly able to generate worlds and write out screenshots, and that the issue isn't simply that your search criteria are too restrictive.
+    - SeedFinder has been searching for hours and I want to change the criteria: Currently, the only option for terminating the search early is to ALT-F4 Rimworld and then relaunch it in order to set new filters. Since no saves are opened / modified by SeedFinder, force closing Rimworld in this fashion holds no risks.
+    - Report any issues you find at https://github.com/xormask/RimworldSeedFinder/issues
+
+Known Issues:
+    - The "Finding Seeds" text is corrupted after pressing the "Search" button and waiting for world generation.
+    - SeedFinder allows you to specify impossible filters (e.g. max map temperature less than min temperature). If you do this, SeedFinder will futilely search forever until you close Rimworld.
+    - The mod assumes default faction settings if you specify the filters that check if faction settlements are within drop-pod range. If you change faction settings when you go to generate the world, the search performed by the mod isn't guaranteed to be valid.
+</description>
+
+    <modDependencies>
+        <li>
+			<packageId>UnlimitedHugs.HugsLib</packageId>
+			<displayName>HugsLib</displayName>
+			<downloadUrl>https://github.com/UnlimitedHugs/RimworldHugsLib/releases/latest</downloadUrl>
+			<steamWorkshopUrl>steam://url/CommunityFilePage/818773962</steamWorkshopUrl>
+		</li>
+    </modDependencies>
+    <loadAfter>
+        <li>UnlimitedHugs.HugsLib</li>
+    </loadAfter>
+</ModMetaData>
