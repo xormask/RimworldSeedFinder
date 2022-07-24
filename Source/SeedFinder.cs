@@ -55,7 +55,7 @@ class FilterParameters {
     public bool needEmpireNear;
 
     public ThingDef firstStone;
-    public List<ThingDef> forbiddenStones;
+    public List<bool> desiredStones;
 
     public FilterParameters()
     {
@@ -76,7 +76,7 @@ class FilterWindow : Verse.Window
         draggable = false;
     }
 
-    public override Vector2 InitialSize => new Vector2(750f, 900f);
+    public override Vector2 InitialSize => new Vector2(750f, 980f);
 
     public override void DoWindowContents(Rect inRect)
     {
@@ -282,7 +282,6 @@ class FilterWindow : Verse.Window
             var offset = 300f;
             for (int idx = 0; idx < SeedFinderController.Instance.allRivers.Count; idx++) {
                 var riverDef = SeedFinderController.Instance.allRivers[idx];
-                var buttonRect = new Rect(offset, curY, buttonSize.x, buttonSize.y);
                 bool desired = filterParams.desiredRivers[idx];
                 var riverLabel = GenText.CapitalizeAsTitle(riverDef.label);
 
@@ -316,7 +315,28 @@ class FilterWindow : Verse.Window
         Widgets.TextFieldNumeric(new Rect(buttonOffset, curY, buttonSize.x, buttonSize.y), ref filterParams.minGeysers, ref geysersTempStr, 0, 10);
 
         curY += skipSize;
-        curY += 8f;
+        curY += 10f;
+
+        Widgets.Label(new Rect(0, curY, 350, labelSize), "Required Stone Types on Map (order doesn't matter)");
+        curY += skipSize;
+        var stoneOffset = 30f;
+        for (int idx = 0; idx < SeedFinderController.Instance.allStones.Count; idx++) {
+            var stoneDef = SeedFinderController.Instance.allStones[idx];
+            bool desired = filterParams.desiredStones[idx];
+            var stoneLabel = GenText.CapitalizeAsTitle(stoneDef.label);
+
+            Widgets.CheckboxLabeled(new Rect(stoneOffset, curY + 3.5f, 150, labelSize - 3), stoneLabel,
+                                    ref desired, disabled: false, null, null, placeCheckboxNearText: true);
+
+            filterParams.desiredStones[idx] = desired;
+
+            var numChars = stoneLabel.Length;
+            stoneOffset += 50 + 7 * numChars;
+        }
+    
+        
+        curY += skipSize;
+        curY += 10f;
 
         // Faction filters
         Widgets.Label(new Rect(0, curY, 350, labelSize), "Require Nearby Settlements: (within drop pod range)");
@@ -519,7 +539,6 @@ public class SeedFinderController : ModBase {
         filterParams.minTemp = -200;
         filterParams.minGeysers = 0;
         filterParams.firstStone = null;
-        filterParams.forbiddenStones = new List<ThingDef>();
 
         filterParams.needCivilOutlanderNear = false;
         filterParams.needRoughOutlanderNear = false;
@@ -533,6 +552,11 @@ public class SeedFinderController : ModBase {
         filterParams.desiredRivers = new List<bool>();
         foreach (var riverDef in allRivers) {
             filterParams.desiredRivers.Add(true);
+        }
+
+        filterParams.desiredStones = new List<bool>();
+        foreach (var riverDef in allStones) {
+            filterParams.desiredStones.Add(false);
         }
     }
 
@@ -860,21 +884,29 @@ public class SeedFinderController : ModBase {
                 continue;
             }
 
-            bool forbiddenFound = false;
-            foreach (var forbiddenStone in filterParams.forbiddenStones) {
-                bool found = false;
-                foreach (var presentStone in tileStones) {
-                    if (presentStone == forbiddenStone) {
-                        found = true;
+            bool requiredStoneMissing = false;
+
+            for (int stoneIdx = 0; stoneIdx < allStones.Count; stoneIdx++) {
+                var stoneDef = allStones[stoneIdx];
+                var desired = filterParams.desiredStones[stoneIdx];
+
+                if (!desired) continue;
+
+                bool stoneFound = false;
+                foreach (var tileStone in tileStones) {
+                    if (tileStone == stoneDef) {
+                        stoneFound = true;
+                        break;
                     }
                 }
 
-                if (found == true) {
-                    forbiddenFound = true;
+                if (!stoneFound) {
+                    requiredStoneMissing = true;
+                    break;
                 }
             }
 
-            if (forbiddenFound) {
+            if (requiredStoneMissing) {
                 continue;
             }
 
