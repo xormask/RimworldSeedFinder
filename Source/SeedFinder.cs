@@ -601,6 +601,27 @@ public class SeedFinderController : ModBase {
             return;
         }
 
+        Find.MusicManagerPlay.ForceFadeoutAndSilenceFor(120f);
+        
+        foreach (var pawn in PawnsFinder.AllMapsCaravansAndTravelingTransportPods_Alive_OfPlayerFaction.ToList()) {
+            pawn.inventory.DestroyAll();
+            if (pawn.Spawned) {
+                pawn.DeSpawn();
+            }
+
+            if (pawn.holdingOwner != null) {
+                pawn.holdingOwner.Remove(pawn);
+            }
+
+            if (!pawn.IsWorldPawn()) {
+                Find.WorldPawns.PassToWorld(pawn);
+            }
+        }
+
+        foreach (var pawn in Find.WorldPawns.AllPawnsAliveOrDead.ToList()) {
+            Find.WorldPawns.RemoveAndDiscardPawnViaGC(pawn);
+        }
+
         int numGeysers = 0;
         foreach (var geyser in map.listerBuildings.AllBuildingsNonColonistOfDef(ThingDefOf.SteamGeyser)) {
             numGeysers++;
@@ -773,7 +794,30 @@ public class SeedFinderController : ModBase {
 
         Current.Game = new Game();
         Current.Game.InitData = new GameInitData();
-        Current.Game.Scenario = ScenarioDefOf.Crashlanded.scenario;
+
+        // Make custom scenario that doesn't spawn any items
+        var scen = new Scenario();
+        scen.Category = ScenarioCategory.CustomLocal;
+        scen.name = "SeedFinderScenario";
+        scen.description = null;
+        scen.summary = null;
+
+        var scenFaction = (ScenPart_PlayerFaction)ScenarioMaker.MakeScenPart(ScenPartDefOf.PlayerFaction);
+        typeof(ScenPart_PlayerFaction).GetField("factionDef", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scenFaction, FactionDefOf.PlayerColony);
+        typeof(Scenario).GetField("playerFaction", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, scenFaction);
+
+        var pawnConfig = (ScenPart_ConfigPage_ConfigureStartingPawns)ScenarioMaker.MakeScenPart(ScenPartDefOf.ConfigPage_ConfigureStartingPawns);
+        pawnConfig.pawnCount = 1;
+        pawnConfig.pawnChoiceCount = 8;
+
+        var scenParts = new List<ScenPart>();
+
+        scenParts.Add(pawnConfig);
+        scenParts.Add(ScenarioMaker.MakeScenPart(ScenPartDefOf.PlayerPawnsArriveMethod));
+        typeof(Scenario).GetField("parts", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, scenParts);
+
+        Current.Game.Scenario = scen;
+
         Find.Scenario.PreConfigure();
         Current.Game.storyteller = new Storyteller(StorytellerDefOf.Cassandra, DifficultyDefOf.Rough);
     }
@@ -802,24 +846,13 @@ public class SeedFinderController : ModBase {
                 int curTile = validTiles.Pop();
 
                 LongEventHandler.QueueLongEvent(delegate {
-                    Find.MusicManagerPlay.ForceFadeoutAndSilenceFor(120f);
-
-                    foreach (var pawn in PawnsFinder.AllMapsCaravansAndTravelingTransportPods_Alive_OfPlayerFaction.ToList()) {
-                        if (pawn.Spawned) {
-                            pawn.DeSpawn();
+                    // Get rid of error spam from triggers trying to run after the map has been destroyed
+                    foreach (var thing in Find.CurrentMap.listerThings.ThingsOfDef(ThingDefOf.RectTrigger).ToList()) {
+                        if (thing.holdingOwner != null) {
+                            thing.holdingOwner.Remove(thing);
                         }
-
-                        if (pawn.holdingOwner != null) {
-                            pawn.holdingOwner.Remove(pawn);
-                        }
-
-                        if (!pawn.IsWorldPawn()) {
-                            Find.WorldPawns.PassToWorld(pawn);
-                        }
-                    }
-
-                    foreach (var pawn in Find.WorldPawns.AllPawnsAliveOrDead.ToList()) {
-                        Find.WorldPawns.RemoveAndDiscardPawnViaGC(pawn);
+                        thing.DeSpawn();
+                        thing.Destroy();
                     }
 
                     var world = Current.Game.World;
