@@ -831,12 +831,15 @@ public class SeedFinderController : ModBase {
                         item.Destroy();
                     }
 
+                    MemoryUtility.UnloadUnusedUnityAssets();
+
                     Settlement settlement = (Settlement)WorldObjectMaker.MakeWorldObject(WorldObjectDefOf.Settlement);
                     settlement.SetFaction(Faction.OfPlayer);
                     settlement.Tile = curTile;
                     settlement.Name = SettlementNameGenerator.GenerateSettlementName(settlement, Faction.OfPlayer.def.playerInitialSettlementNameMaker);
                     Find.WorldObjects.Add(settlement);
-                    GetOrGenerateMapUtility.GetOrGenerateMap(curTile, WorldObjectDefOf.Settlement);
+                    var map = GetOrGenerateMapUtility.GetOrGenerateMap(curTile, WorldObjectDefOf.Settlement);
+                    Current.Game.CurrentMap = map;
 
                     CameraJumper.TryJump(MapGenerator.PlayerStartSpot, settlement.Map);
                 }, "GeneratingMap", doAsynchronously: false, null);
