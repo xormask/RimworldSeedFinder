@@ -293,7 +293,7 @@ class FilterWindow : Verse.Window
                 var numChars = riverLabel.Length;
                 offset += 50 + 6 * numChars;
             }
-    
+
         }
         curY += skipSize;
         curY += 10f;
@@ -333,8 +333,8 @@ class FilterWindow : Verse.Window
             var numChars = stoneLabel.Length;
             stoneOffset += 50 + 7 * numChars;
         }
-    
-        
+
+
         curY += skipSize;
         curY += 10f;
 
@@ -389,7 +389,7 @@ class FilterWindow : Verse.Window
 
             Find.WindowStack.Add(new FloatMenu(options));
         }
-        
+
 
         curY += skipSize;
 
@@ -409,7 +409,7 @@ class FilterWindow : Verse.Window
 
         // Population
         Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Population: ");
-		filterParams.population = (OverallPopulation)Mathf.RoundToInt(Widgets.HorizontalSlider(new Rect(buttonOffset, curY, sliderSize.x, sliderSize.y), (float)filterParams.population, 0f, OverallPopulationUtility.EnumValuesCount - 1, middleAlignment: true, "PlanetPopulation_Normal".Translate(), "PlanetPopulation_Low".Translate(), "PlanetPopulation_High".Translate(), 1f));
+        filterParams.population = (OverallPopulation)Mathf.RoundToInt(Widgets.HorizontalSlider(new Rect(buttonOffset, curY, sliderSize.x, sliderSize.y), (float)filterParams.population, 0f, OverallPopulationUtility.EnumValuesCount - 1, middleAlignment: true, "PlanetPopulation_Normal".Translate(), "PlanetPopulation_Low".Translate(), "PlanetPopulation_High".Translate(), 1f));
 
         curY += skipSize;
 
@@ -420,7 +420,7 @@ class FilterWindow : Verse.Window
         };
 
         if (Widgets.ButtonText(new Rect(buttonOffset, curY, buttonSize.x, buttonSize.y), mapSizeToStr(filterParams.mapSize))) {
-		    int[] mapSizes = new int[6] { 200, 225, 250, 275, 300, 325 };
+            int[] mapSizes = new int[6] { 200, 225, 250, 275, 300, 325 };
 
             var options = new List<FloatMenuOption>();
 
@@ -595,9 +595,9 @@ public class SeedFinderController : ModBase {
             string longitudePostfix = longlat.x >= 0f ? "E" : "W";
 
             string path = Path.Combine(filterParams.outDirectory,
-                string.Concat(filterParams.baseSeed, curSeedOffset, "_",
-                              Math.Abs(longlat.y).ToString("F2"), latitudePostfix,
-                              "_", Math.Abs(longlat.x).ToString("F2"), longitudePostfix, ".png"));
+                                       string.Concat(filterParams.baseSeed, curSeedOffset, "_",
+                                                     Math.Abs(longlat.y).ToString("F2"), latitudePostfix,
+                                                     "_", Math.Abs(longlat.x).ToString("F2"), longitudePostfix, ".png"));
 
             Find.CameraDriver.StartCoroutine(RenderAndSave(Find.CurrentMap, path));
 
@@ -721,30 +721,43 @@ public class SeedFinderController : ModBase {
 
     private void visitNextMap() {
         LongEventHandler.ClearQueuedEvents();
-
         LongEventHandler.QueueLongEvent(delegate {
-            resetGame();
-            LongEventHandler.QueueLongEvent(delegate {
-                if (validTiles.Count == 0) {
+            if (validTiles.Count == 0) {
+                resetGame();
+                LongEventHandler.QueueLongEvent(delegate {
                     while (validTiles.Count == 0) {
                         curSeedOffset++;
                         generateWorld();
                         filterTiles();
                     }
-                } else {
-                    generateWorld();
-                }
 
+                    int curTile = validTiles.Pop();
+                    Find.GameInitData.startingTile = curTile;
+                    Find.GameInitData.mapSize = filterParams.mapSize;
+                    Find.Scenario.PostIdeoChosen();
+                    Find.GameInitData.PrepForMapGen();
+                    Find.Scenario.PreMapGenerate();
+                }, "Play", "Finding  Seeds", doAsynchronously: true, GameAndMapInitExceptionHandlers.ErrorWhileGeneratingMap);
+            } else {
                 int curTile = validTiles.Pop();
 
-                Logger.Message(string.Concat("Found Seed: ", curSeedOffset, ", Tile: ", curTile));
+                LongEventHandler.QueueLongEvent(delegate {
+                    Find.MusicManagerPlay.ForceFadeoutAndSilenceFor(120f);
 
-                Find.GameInitData.startingTile = curTile;
-                Find.GameInitData.mapSize = filterParams.mapSize;
-                Find.Scenario.PostIdeoChosen();
-                Find.GameInitData.PrepForMapGen();
-                Find.Scenario.PreMapGenerate();
-            }, "Play", "Finding  Seeds", doAsynchronously: true, GameAndMapInitExceptionHandlers.ErrorWhileGeneratingMap);
+                    List<Thing> things = new List<Thing>();
+                    things.AddRange(MoveColonyUtility.GetStartingThingsForNewColony());
+
+                    foreach (Pawn item in PawnsFinder.AllMapsCaravansAndTravelingTransportPods_Alive_OfPlayerFaction) {
+                        if (item.IsColonist) {
+                            things.Add(item);
+                        }
+                    }
+
+                    Settlement settlement = MoveColonyUtility.MoveColonyAndReset(curTile, things, null, null);
+                    CameraJumper.TryJump(MapGenerator.PlayerStartSpot, settlement.Map);
+
+                }, "GeneratingMap", doAsynchronously: false, null);
+            }
         }, "Finding Seeds", doAsynchronously: true, null, showExtraUIInfo: false);
     }
 
