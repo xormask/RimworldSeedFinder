@@ -424,7 +424,12 @@ class FilterWindow : Verse.Window
         };
 
         if (Widgets.ButtonText(new Rect(buttonOffset, curY, buttonSize.x, buttonSize.y), mapSizeToStr(filterParams.mapSize))) {
-            int[] mapSizes = new int[6] { 200, 225, 250, 275, 300, 325 };
+            var mapSizes = new List<int>() { 200, 225, 250, 275, 300, 325 };
+
+            if (Prefs.TestMapSizes) {
+                mapSizes.Add(350);
+                mapSizes.Add(400);
+            }
 
             var options = new List<FloatMenuOption>();
 
