@@ -2,6 +2,7 @@
 using System.IO;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Linq;
 using HarmonyLib;
 using HugsLib;
@@ -32,6 +33,7 @@ class FilterParameters {
     public string baseSeed;
     public int maxFound;
     public bool clearFog;
+    public bool showAnimaCircle;
     public float planetCoverage;
     public OverallRainfall rainfall;
     public OverallTemperature temperature;
@@ -117,7 +119,9 @@ class FilterWindow : Verse.Window
 
         curY += skipSize;
 
-        Widgets.CheckboxLabeled(new Rect(0, curY, 300, labelSize), "Clear Fog in Screenshots", ref filterParams.clearFog, disabled: false, null, null, placeCheckboxNearText: true);
+        Widgets.CheckboxLabeled(new Rect(0, curY, 150, labelSize), "Clear Fog in Screenshots", ref filterParams.clearFog, disabled: false, null, null, placeCheckboxNearText: true);
+
+        Widgets.CheckboxLabeled(new Rect(150, curY, 150, labelSize), "Show Anima Tree Radius", ref filterParams.showAnimaCircle, disabled: false, null, null, placeCheckboxNearText: true);
 
         curY += 60f;
 
@@ -468,6 +472,8 @@ public class SeedFinderController : ModBase {
     private bool needCapture;
     private bool captureFinished;
     private FilterParameters filterParams;
+    private Vector2 origAnimaSize;
+    private float animaRadius;
     public List<ThingDef> allStones { get; private set; }
     public List<RiverDef> allRivers { get; private set; }
 
@@ -491,6 +497,8 @@ public class SeedFinderController : ModBase {
     private SeedFinderController() {
         Instance = this;
         filterParams = new FilterParameters();
+        origAnimaSize = new Vector2(0, 0);
+        animaRadius = -1f;
         reset();
     }
 
@@ -507,7 +515,15 @@ public class SeedFinderController : ModBase {
     internal void startFinding() {
         isSeedFinding = true;
 
+        ThingDefOf.Plant_TreeAnima.graphicData.drawSize *= 2.5f;
+
         visitNextMap();
+    }
+
+    internal void stopFinding() {
+        reset();
+
+        ThingDefOf.Plant_TreeAnima.graphicData.drawSize = origAnimaSize;
     }
 
     public override void Initialize() {
@@ -516,6 +532,7 @@ public class SeedFinderController : ModBase {
         filterParams.baseSeed = GenText.RandomSeedString();
         filterParams.maxFound = 100;
         filterParams.clearFog = false;
+        filterParams.showAnimaCircle = true;
         filterParams.planetCoverage = 1f;
         filterParams.rainfall = OverallRainfall.Normal;
         filterParams.temperature = OverallTemperature.Normal;
@@ -558,6 +575,25 @@ public class SeedFinderController : ModBase {
         foreach (var riverDef in allStones) {
             filterParams.desiredStones.Add(false);
         }
+
+        origAnimaSize = ThingDefOf.Plant_TreeAnima.graphicData.drawSize;
+
+        foreach (var animaComp in ThingDefOf.Plant_TreeAnima.comps) {
+            var meditationComp = animaComp as CompProperties_MeditationFocus;
+            if (meditationComp != null) {
+                foreach (var offset in meditationComp.offsets) {
+                    var radiusOffset = offset as FocusStrengthOffset_ArtificialBuildings;
+                    if (radiusOffset != null) {
+                        animaRadius = radiusOffset.radius;
+                        break;
+                    }
+                }
+            }
+
+            if (animaRadius != -1f) {
+                break;
+            }
+        }
     }
 
     public override void MapLoaded(Map map) {
@@ -576,6 +612,23 @@ public class SeedFinderController : ModBase {
             if (filterParams.clearFog) {
                 map.fogGrid.ClearAllFog();
             }
+
+            float longitude = Find.WorldGrid.LongLatOf(map.Tile).x;
+            long absTicks = Find.TickManager.TicksAbs;
+
+            int dayTicks = GenDate.DayTick(absTicks, longitude);
+            // Slight offset from noon to preserve shadows
+            int advanceTicks = 25000;
+            if (dayTicks > advanceTicks) {
+                advanceTicks += 60000 - dayTicks;
+            } else {
+                advanceTicks -= dayTicks;
+            }
+
+            Find.TickManager.DebugSetTicksGame(Find.TickManager.TicksGame + advanceTicks);
+
+            // Uniform weather
+            map.weatherManager.curWeather = WeatherDefOf.Clear;
         } else {
             captureFinished = true;
         }
@@ -610,7 +663,7 @@ public class SeedFinderController : ModBase {
             if (numFound < filterParams.maxFound) {
                 visitNextMap();
             } else {
-                reset();
+                stopFinding();
                 GenScene.GoToMainMenu();
             }
         }
@@ -620,6 +673,12 @@ public class SeedFinderController : ModBase {
     // LGPL 3 License
     private IEnumerator RenderAndSave(Map map, string path) {
         yield return new WaitForFixedUpdate();
+
+        if (filterParams.showAnimaCircle) {
+            foreach (var animaThing in Find.CurrentMap.listerThings.ThingsOfDef(ThingDefOf.Plant_TreeAnima)) {
+                GenDraw.DrawRadiusRing(animaThing.Position, animaRadius, MeditationUtility.ArtificialBuildingRingColor);
+            }
+        }
 
         CameraJumper.TryHideWorld();
         float startX = 0;
@@ -755,7 +814,6 @@ public class SeedFinderController : ModBase {
 
                     Settlement settlement = MoveColonyUtility.MoveColonyAndReset(curTile, things, null, null);
                     CameraJumper.TryJump(MapGenerator.PlayerStartSpot, settlement.Map);
-
                 }, "GeneratingMap", doAsynchronously: false, null);
             }
         }, "Finding Seeds", doAsynchronously: true, null, showExtraUIInfo: false);
