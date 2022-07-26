@@ -119,9 +119,9 @@ class FilterWindow : Verse.Window
 
         curY += skipSize;
 
-        Widgets.CheckboxLabeled(new Rect(0, curY, 150, labelSize), "Clear Fog in Screenshots", ref filterParams.clearFog, disabled: false, null, null, placeCheckboxNearText: true);
+        Widgets.CheckboxLabeled(new Rect(0, curY, 250, labelSize), "Clear Fog in Screenshots", ref filterParams.clearFog, disabled: false, null, null, placeCheckboxNearText: true);
 
-        Widgets.CheckboxLabeled(new Rect(150, curY, 150, labelSize), "Show Anima Tree Radius", ref filterParams.showAnimaCircle, disabled: false, null, null, placeCheckboxNearText: true);
+        Widgets.CheckboxLabeled(new Rect(250, curY, 250, labelSize), "Show Anima Tree Radius", ref filterParams.showAnimaCircle, disabled: false, null, null, placeCheckboxNearText: true);
 
         curY += 60f;
 
@@ -798,21 +798,46 @@ public class SeedFinderController : ModBase {
                     Find.Scenario.PreMapGenerate();
                 }, "Play", "Finding  Seeds", doAsynchronously: true, GameAndMapInitExceptionHandlers.ErrorWhileGeneratingMap);
             } else {
+                int oldTile = Find.CurrentMap.Tile;
                 int curTile = validTiles.Pop();
 
                 LongEventHandler.QueueLongEvent(delegate {
                     Find.MusicManagerPlay.ForceFadeoutAndSilenceFor(120f);
 
-                    List<Thing> things = new List<Thing>();
-                    things.AddRange(MoveColonyUtility.GetStartingThingsForNewColony());
+                    foreach (var pawn in PawnsFinder.AllMapsCaravansAndTravelingTransportPods_Alive_OfPlayerFaction.ToList()) {
+                        if (pawn.Spawned) {
+                            pawn.DeSpawn();
+                        }
 
-                    foreach (Pawn item in PawnsFinder.AllMapsCaravansAndTravelingTransportPods_Alive_OfPlayerFaction) {
-                        if (item.IsColonist) {
-                            things.Add(item);
+                        if (pawn.holdingOwner != null) {
+                            pawn.holdingOwner.Remove(pawn);
+                        }
+
+                        if (!pawn.IsWorldPawn()) {
+                            Find.WorldPawns.PassToWorld(pawn);
                         }
                     }
 
-                    Settlement settlement = MoveColonyUtility.MoveColonyAndReset(curTile, things, null, null);
+                    foreach (var pawn in Find.WorldPawns.AllPawnsAliveOrDead.ToList()) {
+                        Find.WorldPawns.RemoveAndDiscardPawnViaGC(pawn);
+                    }
+
+                    var world = Current.Game.World;
+                    Current.Game.World = null;
+                    MemoryUtility.ClearAllMapsAndWorld();
+                    Current.Game.World = world;
+
+                    foreach (WorldObject item in Find.WorldObjects.ObjectsAt(oldTile).ToList()) {
+                        item.Destroy();
+                    }
+
+                    Settlement settlement = (Settlement)WorldObjectMaker.MakeWorldObject(WorldObjectDefOf.Settlement);
+                    settlement.SetFaction(Faction.OfPlayer);
+                    settlement.Tile = curTile;
+                    settlement.Name = SettlementNameGenerator.GenerateSettlementName(settlement, Faction.OfPlayer.def.playerInitialSettlementNameMaker);
+                    Find.WorldObjects.Add(settlement);
+                    GetOrGenerateMapUtility.GetOrGenerateMap(curTile, WorldObjectDefOf.Settlement);
+
                     CameraJumper.TryJump(MapGenerator.PlayerStartSpot, settlement.Map);
                 }, "GeneratingMap", doAsynchronously: false, null);
             }
@@ -886,7 +911,7 @@ public class SeedFinderController : ModBase {
         for (var tileID = 0; tileID < tileCount; tileID++) {
             var tile = Current.Game.World.grid[tileID];
 
-            if (!tile.biome.canBuildBase || !tile.biome.implemented) {
+            if (!TileFinder.IsValidTileForNewSettlement(tileID)) {
                 continue;
             }
 
