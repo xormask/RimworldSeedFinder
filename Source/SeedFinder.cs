@@ -713,8 +713,13 @@ public class SeedFinderController : ModBase {
             string latitudePostfix = longlat.y >= 0f ? "N" : "S";
             string longitudePostfix = longlat.x >= 0f ? "E" : "W";
 
+            string seedStr = filterParams.baseSeed;
+            if (curSeedOffset > 1) {
+                seedStr += curSeedOffset.ToString();
+            }
+
             string path = Path.Combine(filterParams.outDirectory,
-                                       string.Concat(filterParams.baseSeed, curSeedOffset, "_",
+                                       string.Concat(seedStr, "_",
                                                      Math.Abs(longlat.y).ToString("F2"), latitudePostfix,
                                                      "_", Math.Abs(longlat.x).ToString("F2"), longitudePostfix, ".png"));
 
@@ -954,7 +959,10 @@ public class SeedFinderController : ModBase {
 
     private void generateWorld() {
         Find.GameInitData.ResetWorldRelatedMapInitData();
-        string seedString = filterParams.baseSeed + curSeedOffset;
+        string seedString = filterParams.baseSeed;
+        if (curSeedOffset > 1) {
+            seedString += curSeedOffset.ToString();
+        }
 
         Current.Game.World = WorldGenerator.GenerateWorld(filterParams.planetCoverage, seedString,
                                                           filterParams.rainfall,
