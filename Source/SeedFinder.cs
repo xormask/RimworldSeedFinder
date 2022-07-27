@@ -33,7 +33,7 @@ class FilterParameters {
     public string baseSeed;
     public int maxFound;
     public bool clearFog;
-    public bool showAnimaCircle;
+    public bool highlightPOI;
     public float planetCoverage;
     public OverallRainfall rainfall;
     public OverallTemperature temperature;
@@ -50,6 +50,7 @@ class FilterParameters {
     public int maxTemp;
     public int minTemp;
     public int minGeysers;
+    public int minRichSoilTiles;
     public bool needCivilOutlanderNear;
     public bool needRoughOutlanderNear;
     public bool needCivilTribeNear;
@@ -121,7 +122,7 @@ class FilterWindow : Verse.Window
 
         Widgets.CheckboxLabeled(new Rect(0, curY, 250, labelSize), "Clear Fog in Screenshots", ref filterParams.clearFog, disabled: false, null, null, placeCheckboxNearText: true);
 
-        Widgets.CheckboxLabeled(new Rect(250, curY, 250, labelSize), "Show Anima Tree Radius", ref filterParams.showAnimaCircle, disabled: false, null, null, placeCheckboxNearText: true);
+        Widgets.CheckboxLabeled(new Rect(250, curY, 360, labelSize), "Highlight Map Features (Anima Tree, Geysers, etc)", ref filterParams.highlightPOI, disabled: false, null, null, placeCheckboxNearText: true);
 
         curY += 60f;
 
@@ -317,6 +318,10 @@ class FilterWindow : Verse.Window
         Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Min Geysers: ");
         string geysersTempStr = filterParams.minGeysers.ToString();
         Widgets.TextFieldNumeric(new Rect(buttonOffset, curY, buttonSize.x, buttonSize.y), ref filterParams.minGeysers, ref geysersTempStr, 0, 10);
+
+        Widgets.Label(new Rect(rightOffset, curY, buttonOffset, labelSize), "Min Fertile Soil Tiles: ");
+        string soilTempStr = filterParams.minRichSoilTiles.ToString();
+        Widgets.TextFieldNumeric(new Rect(rightOffset + buttonOffset, curY, buttonSize.x, buttonSize.y), ref filterParams.minRichSoilTiles, ref soilTempStr, 0, int.MaxValue);
 
         curY += skipSize;
         curY += 10f;
@@ -537,7 +542,7 @@ public class SeedFinderController : ModBase {
         filterParams.baseSeed = GenText.RandomSeedString();
         filterParams.maxFound = 100;
         filterParams.clearFog = false;
-        filterParams.showAnimaCircle = true;
+        filterParams.highlightPOI = true;
         filterParams.planetCoverage = 1f;
         filterParams.rainfall = OverallRainfall.Normal;
         filterParams.temperature = OverallTemperature.Normal;
@@ -560,6 +565,7 @@ public class SeedFinderController : ModBase {
         filterParams.maxTemp = 200;
         filterParams.minTemp = -200;
         filterParams.minGeysers = 0;
+        filterParams.minRichSoilTiles = 0;
         filterParams.firstStone = null;
 
         filterParams.needCivilOutlanderNear = false;
@@ -601,6 +607,16 @@ public class SeedFinderController : ModBase {
         }
     }
 
+    internal float FertilityAt(Map map, IntVec3 loc) {
+        float topFertility = map.terrainGrid.TerrainAt(loc).fertility;
+        float bottomFertility = 0f;
+        if (map.terrainGrid.CanRemoveTopLayerAt(loc)) {
+            bottomFertility = map.terrainGrid.UnderTerrainAt(loc).fertility;
+        }
+
+        return Mathf.Max(topFertility, bottomFertility);
+    }
+
     public override void MapLoaded(Map map) {
         if (!isSeedFinding) {
             return;
@@ -632,7 +648,31 @@ public class SeedFinderController : ModBase {
             numGeysers++;
         }
 
-        if (numGeysers >= filterParams.minGeysers) {
+        bool mapFilterPassed = true;
+
+        if (numGeysers < filterParams.minGeysers) {
+            mapFilterPassed = false;
+        }
+
+        if (filterParams.minRichSoilTiles != 0 && mapFilterPassed) {
+            int numRichSoilTiles = 0;
+
+            for (int z = 0; z < map.Size.z; z++) {
+                for (int x = 0; x < map.Size.x; x++) {
+                    var loc = new IntVec3(x, 0, z);
+
+                    if (FertilityAt(map, loc) >= 1.1f) {
+                        numRichSoilTiles++;
+                    }
+                }
+            }
+
+            if (numRichSoilTiles < filterParams.minRichSoilTiles) {
+                mapFilterPassed = false;
+            }
+        }
+
+        if (mapFilterPassed) {
             needCapture = true;
 
             if (filterParams.clearFog) {
@@ -700,10 +740,37 @@ public class SeedFinderController : ModBase {
     private IEnumerator RenderAndSave(Map map, string path) {
         yield return new WaitForFixedUpdate();
 
-        if (filterParams.showAnimaCircle) {
+        if (filterParams.highlightPOI) {
             foreach (var animaThing in Find.CurrentMap.listerThings.ThingsOfDef(ThingDefOf.Plant_TreeAnima)) {
                 GenDraw.DrawRadiusRing(animaThing.Position, animaRadius, MeditationUtility.ArtificialBuildingRingColor);
             }
+
+            foreach (var geyser in map.listerBuildings.AllBuildingsNonColonistOfDef(ThingDefOf.SteamGeyser)) {
+                GenDraw.DrawRadiusRing(geyser.Position, 4f, new Color(0.8f, 0.1f, 0.6f), (IntVec3 v) => {
+                    float geyserDistX = geyser.Position.x + 0.5f - (float)v.x;
+                    float geyserDistZ = geyser.Position.z + 0.5f - (float)v.z;
+
+                    float geyserDist = Mathf.Sqrt(geyserDistX * geyserDistX + geyserDistZ * geyserDistZ);
+
+                    return geyserDist <= 3.5f;
+                });
+            }
+
+            var fertilityDrawer = new CellBoolDrawer((int idx) => {
+                var loc = CellIndicesUtility.IndexToCell(idx, map.Size.x);
+                if (loc.Filled(map) || loc.Fogged(map)) {
+                    return false;
+                }
+
+                return FertilityAt(map, loc) >= 1.1f;
+            }, () => {
+                return Color.white;
+            }, (int idx) => {
+                return Color.green;
+            }, map.Size.z, map.Size.z, 3610);
+
+            fertilityDrawer.MarkForDraw();
+            fertilityDrawer.CellBoolDrawerUpdate();
         }
 
         CameraJumper.TryHideWorld();
@@ -880,7 +947,7 @@ public class SeedFinderController : ModBase {
                     Current.Game.CurrentMap = map;
 
                     CameraJumper.TryJump(MapGenerator.PlayerStartSpot, settlement.Map);
-                }, "GeneratingMap", doAsynchronously: false, null);
+                }, "GeneratingMap", doAsynchronously: true, null);
             }
         }, "Finding Seeds", doAsynchronously: true, null, showExtraUIInfo: false);
     }
