@@ -723,6 +723,18 @@ public class SeedFinderController : ModBase {
             Find.WorldPawns.RemoveAndDiscardPawnViaGC(pawn);
         }
 
+        // Get rid of error spam from triggers trying to run after the map has been destroyed
+        foreach (var thing in map.listerThings.AllThings.ToList()) {
+            if (thing.def == ThingDefOf.InsectJelly || thing.def == ThingDefOf.RectTrigger || thing.Faction == Faction.OfMechanoids ||
+                thing.Faction == Faction.OfInsects || thing.Faction == Faction.OfAncients || thing.Faction == Faction.OfAncientsHostile) {
+                if (thing.holdingOwner != null) {
+                    thing.holdingOwner.Remove(thing);
+                }
+                thing.DeSpawn();
+                thing.Destroy();
+            }
+        }
+
         int numGeysers = 0;
         foreach (var geyser in map.listerBuildings.AllBuildingsNonColonistOfDef(ThingDefOf.SteamGeyser)) {
             numGeysers++;
@@ -1003,15 +1015,6 @@ public class SeedFinderController : ModBase {
                 int curTile = validTiles.Pop();
 
                 LongEventHandler.QueueLongEvent(delegate {
-                    // Get rid of error spam from triggers trying to run after the map has been destroyed
-                    foreach (var thing in Find.CurrentMap.listerThings.ThingsOfDef(ThingDefOf.RectTrigger).ToList()) {
-                        if (thing.holdingOwner != null) {
-                            thing.holdingOwner.Remove(thing);
-                        }
-                        thing.DeSpawn();
-                        thing.Destroy();
-                    }
-
                     var world = Current.Game.World;
                     Current.Game.World = null;
                     MemoryUtility.ClearAllMapsAndWorld();
