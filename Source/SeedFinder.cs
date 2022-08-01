@@ -28,6 +28,13 @@ enum Hemisphere {
     Either
 };
 
+enum Seasonality {
+    Any,
+    Normal,
+    PermSummer,
+    PermWinter,
+};
+
 class FilterParameters {
     public string outDirectory;
     public string baseSeed;
@@ -49,6 +56,8 @@ class FilterParameters {
     public Hemisphere hemisphere;
     public int maxTemp;
     public int minTemp;
+    public int minGrowingDays;
+    public Seasonality seasonality;
     public int minGeysers;
     public int minRichSoilTiles;
     public bool needCivilOutlanderNear;
@@ -79,7 +88,7 @@ class FilterWindow : Verse.Window
         draggable = false;
     }
 
-    public override Vector2 InitialSize => new Vector2(750f, 980f);
+    public override Vector2 InitialSize => new Vector2(750f, 1020f);
 
     public override void DoWindowContents(Rect inRect)
     {
@@ -302,6 +311,58 @@ class FilterWindow : Verse.Window
         }
         curY += skipSize;
         curY += 10f;
+
+        // Growing days
+        Func<int, String> growingDaysToStr = (int growingDays) => {
+            if (growingDays < 60) {
+                return growingDays.ToString();
+            }
+
+            return "Year-round";
+        };
+
+        Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Min Growing Days: ");
+        if (Widgets.ButtonText(new Rect(buttonOffset, curY, buttonSize.x, buttonSize.y), growingDaysToStr(filterParams.minGrowingDays), true, true, true)) {
+            var growingIncrements = new List<int>() { 0, 10, 20, 30, 40, 50, 60 };
+            var options = new List<FloatMenuOption>();
+            foreach (var growingDays in growingIncrements) {
+                var label = growingDaysToStr(growingDays);
+                options.Add(new FloatMenuOption(label, () => {
+                    filterParams.minGrowingDays = growingDays;
+                }));
+            }
+
+            Find.WindowStack.Add(new FloatMenu(options));
+        }
+
+        // Permanent Summer
+        Widgets.Label(new Rect(rightOffset, curY, buttonOffset, labelSize), "Seasonality: ");
+
+        Func<Seasonality, String> seasonalityToStr = (Seasonality seasonality) => {
+            if (seasonality == Seasonality.Normal) {
+                return "Normal";
+            } else if (seasonality == Seasonality.PermSummer) {
+                return "Permanent Summer";
+            } else if (seasonality == Seasonality.PermWinter) {
+                return "Permanent Winter";
+            } else {
+                return "Don't Care";
+            }
+        };
+
+        if (Widgets.ButtonText(new Rect(rightOffset + buttonOffset, curY, buttonSize.x, buttonSize.y), seasonalityToStr(filterParams.seasonality), true, true, true)) {
+            var seasonalities = new List<Seasonality>() { Seasonality.Any, Seasonality.Normal, Seasonality.PermSummer, Seasonality.PermWinter };
+            var options = new List<FloatMenuOption>();
+            foreach (var seasonality in seasonalities) {
+                options.Add(new FloatMenuOption(seasonalityToStr(seasonality), () => {
+                    filterParams.seasonality = seasonality;
+                }));
+            }
+
+            Find.WindowStack.Add(new FloatMenu(options));
+        }
+
+        curY += skipSize;
 
         // Min Temp 
         Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Min Allowed Temp: ");
@@ -564,6 +625,8 @@ public class SeedFinderController : ModBase {
 
         filterParams.maxTemp = 200;
         filterParams.minTemp = -200;
+        filterParams.minGrowingDays = 0;
+        filterParams.seasonality = Seasonality.Any;
         filterParams.minGeysers = 0;
         filterParams.minRichSoilTiles = 0;
         filterParams.firstStone = null;
@@ -1084,16 +1147,41 @@ public class SeedFinderController : ModBase {
             float maxTemp = GenTemperature.CelsiusTo(GenTemperature.MaxTemperatureAtTile(tileID),
                                                      Prefs.TemperatureMode);
 
-            float minTemp = GenTemperature.CelsiusTo(GenTemperature.MaxTemperatureAtTile(tileID),
+            float minTemp = GenTemperature.CelsiusTo(GenTemperature.MinTemperatureAtTile(tileID),
                                                      Prefs.TemperatureMode);
 
             if (maxTemp > (float)filterParams.maxTemp || minTemp < (float)filterParams.minTemp) {
                 continue;
             }
 
+            int numGrowingDays = GenTemperature.TwelfthsInAverageTemperatureRange(tileID, 6f, 42f).Count * 5;
+
+            if (numGrowingDays < filterParams.minGrowingDays) {
+                continue;
+            }
+
             var tileStones = Find.World.NaturalRockTypesIn(tileID).ToList();
             if (filterParams.firstStone != null && tileStones[0] != filterParams.firstStone) {
                 continue;
+            }
+
+            if (filterParams.seasonality != Seasonality.Any) {
+                Vector2 longlat = Find.WorldGrid.LongLatOf(tileID);
+                Season season = SeasonUtility.GetReportedSeason(0, longlat.y);
+
+                if (season == Season.PermanentSummer) {
+                    if (filterParams.seasonality != Seasonality.PermSummer) {
+                        continue;
+                    }
+                } else if (season == Season.PermanentWinter) {
+                    if (filterParams.seasonality != Seasonality.PermWinter) {
+                        continue;
+                    }
+                } else {
+                    if (filterParams.seasonality != Seasonality.Normal) {
+                        continue;
+                    }
+                }
             }
 
             bool requiredStoneMissing = false;
