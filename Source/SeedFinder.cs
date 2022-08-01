@@ -69,6 +69,8 @@ class FilterParameters {
     public ThingDef firstStone;
     public List<bool> desiredStones;
 
+    public Vector2 stoneScroll;
+
     public FilterParameters()
     {
     }
@@ -389,7 +391,20 @@ class FilterWindow : Verse.Window
 
         Widgets.Label(new Rect(0, curY, 350, labelSize), "Required Stone Types on Map (order doesn't matter)");
         curY += skipSize;
+
+        float totalStoneWidth = 0f;
+        for (int idx = 0; idx < SeedFinderController.Instance.allStones.Count; idx++) {
+            var stoneDef = SeedFinderController.Instance.allStones[idx];
+            var stoneLabel = GenText.CapitalizeAsTitle(stoneDef.label);
+
+            totalStoneWidth += 50 + 7 * stoneLabel.Length;
+        }
+
         var stoneOffset = 30f;
+        Rect fullStoneRect = new Rect(30f, curY, totalStoneWidth, labelSize + 20f);
+        Rect scrollRect = new Rect(30f, curY, inRect.width - 10f, labelSize + 20f);
+        Widgets.ScrollHorizontal(scrollRect, ref filterParams.stoneScroll, fullStoneRect);
+        Widgets.BeginScrollView(scrollRect, ref filterParams.stoneScroll, fullStoneRect);
         for (int idx = 0; idx < SeedFinderController.Instance.allStones.Count; idx++) {
             var stoneDef = SeedFinderController.Instance.allStones[idx];
             bool desired = filterParams.desiredStones[idx];
@@ -403,7 +418,7 @@ class FilterWindow : Verse.Window
             var numChars = stoneLabel.Length;
             stoneOffset += 50 + 7 * numChars;
         }
-
+        Widgets.EndScrollView();
 
         curY += skipSize;
         curY += 10f;
@@ -649,6 +664,8 @@ public class SeedFinderController : ModBase {
         foreach (var riverDef in allStones) {
             filterParams.desiredStones.Add(false);
         }
+
+        filterParams.stoneScroll = new Vector2(0, 0);
 
         origAnimaSize = ThingDefOf.Plant_TreeAnima.graphicData.drawSize;
 
