@@ -35,7 +35,7 @@ enum Seasonality {
     PermWinter,
 };
 
-class FilterParameters {
+class SeedFinderFilterParameters {
     public string outDirectory;
     public string baseSeed;
     public int maxFound;
@@ -45,8 +45,9 @@ class FilterParameters {
     public OverallRainfall rainfall;
     public OverallTemperature temperature;
     public OverallPopulation population;
+    public float pollution;
     public int mapSize;
-    public Dictionary<FactionDef, int> factionCounts;
+    public List<FactionDef> factions;
     public BiomeDef biome;
     public Hilliness hilliness;
     public FeatureFilter river;
@@ -71,16 +72,16 @@ class FilterParameters {
 
     public Vector2 stoneScroll;
 
-    public FilterParameters()
+    public SeedFinderFilterParameters()
     {
     }
 }
 
 class FilterWindow : Verse.Window
 {
-    private FilterParameters filterParams;
+    private SeedFinderFilterParameters filterParams;
 
-    public FilterWindow(FilterParameters fp)
+    public FilterWindow(SeedFinderFilterParameters fp)
     {
         filterParams = fp;
         doCloseX = true;
@@ -90,7 +91,7 @@ class FilterWindow : Verse.Window
         draggable = false;
     }
 
-    public override Vector2 InitialSize => new Vector2(750f, 1020f);
+    public override Vector2 InitialSize => new Vector2(750f, 1060f);
 
     public override void DoWindowContents(Rect inRect)
     {
@@ -498,6 +499,12 @@ class FilterWindow : Verse.Window
 
         curY += skipSize;
 
+        // Pollution 
+        Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Pollution: ");
+        filterParams.pollution = Widgets.HorizontalSlider(new Rect(buttonOffset, curY, sliderSize.x, sliderSize.y), filterParams.pollution, 0f, 1f, middleAlignment: true,  filterParams.pollution.ToStringPercent(), null, null, 0.05f);
+
+        curY += skipSize;
+
         // Map size
         Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Map Size: ");
         Func<int, string> mapSizeToStr = (int size) => {
@@ -557,7 +564,7 @@ public class SeedFinderController : ModBase {
     private bool isSeedFinding;
     private bool needCapture;
     private bool captureFinished;
-    private FilterParameters filterParams;
+    private SeedFinderFilterParameters filterParams;
     private Vector2 origAnimaSize;
     private float animaRadius;
     public List<ThingDef> allStones { get; private set; }
@@ -582,7 +589,7 @@ public class SeedFinderController : ModBase {
 
     private SeedFinderController() {
         Instance = this;
-        filterParams = new FilterParameters();
+        filterParams = new SeedFinderFilterParameters();
         origAnimaSize = new Vector2(0, 0);
         animaRadius = -1f;
         reset();
@@ -623,11 +630,12 @@ public class SeedFinderController : ModBase {
         filterParams.rainfall = OverallRainfall.Normal;
         filterParams.temperature = OverallTemperature.Normal;
         filterParams.population = OverallPopulation.Normal;
+        filterParams.pollution = (ModsConfig.BiotechActive ? 0.05f : 0f);
         filterParams.mapSize = 250;
 
-        filterParams.factionCounts = new Dictionary<FactionDef, int>();
-        foreach (FactionDef configurableFaction in FactionGenerator.ConfigurableFactions) {
-            filterParams.factionCounts.Add(configurableFaction, configurableFaction.startingCountAtWorldCreation);
+        filterParams.factions = new List<FactionDef>();
+        foreach (FactionDef faction in FactionGenerator.ConfigurableFactions) {
+            filterParams.factions.Add(faction);
         }
 
         filterParams.biome = DefDatabase<BiomeDef>.AllDefsListForReading[0];
@@ -1051,7 +1059,8 @@ public class SeedFinderController : ModBase {
                                                           filterParams.rainfall,
                                                           filterParams.temperature,
                                                           filterParams.population,
-                                                          filterParams.factionCounts);
+                                                          filterParams.factions,
+                                                          filterParams.pollution);
     }
 
     private void filterTiles() {
