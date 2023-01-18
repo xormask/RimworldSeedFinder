@@ -1040,7 +1040,7 @@ public class SeedFinderController : ModBase {
                     Find.Scenario.PostIdeoChosen();
                     Find.GameInitData.PrepForMapGen();
                     Find.Scenario.PreMapGenerate();
-                }, "Play", "Finding  Seeds", doAsynchronously: true, GameAndMapInitExceptionHandlers.ErrorWhileGeneratingMap);
+                }, "Play", "SeedFinder.FindingSeeds", doAsynchronously: true, GameAndMapInitExceptionHandlers.ErrorWhileGeneratingMap);
             } else {
                 int oldTile = Find.CurrentMap.Tile;
                 int curTile = validTiles.Pop();
