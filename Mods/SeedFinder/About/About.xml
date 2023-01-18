@@ -20,7 +20,6 @@ Troubleshooting:
     - Report any issues you find at https://github.com/xormask/RimworldSeedFinder/issues
 
 Known Issues:
-    - The "Finding Seeds" text is corrupted after pressing the "Search" button and waiting for world generation.
     - SeedFinder allows you to specify impossible filters (e.g. max map temperature less than min temperature). If you do this, SeedFinder will futilely search forever until you close Rimworld.
     - The mod assumes default faction settings if you specify the filters that check if faction settlements are within drop-pod range. If you change faction settings when you go to generate the world, the search performed by the mod isn't guaranteed to be valid.
 </description>
