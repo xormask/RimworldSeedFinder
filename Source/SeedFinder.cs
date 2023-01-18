@@ -2,6 +2,7 @@
 using System.IO;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Linq;
 using HarmonyLib;
@@ -71,6 +72,7 @@ class SeedFinderFilterParameters {
     public List<bool> desiredStones;
 
     public Vector2 stoneScroll;
+    public Vector2 windowScroll;
 
     public SeedFinderFilterParameters()
     {
@@ -90,34 +92,44 @@ class FilterWindow : Verse.Window
         resizeable = false;
         draggable = false;
     }
-
-    public override Vector2 InitialSize => new Vector2(750f, 1060f);
+    public override Vector2 InitialSize => new Vector2(750f, UI.screenHeight - 100);
 
     public override void DoWindowContents(Rect inRect)
     {
+        float curY = 0f;
         var buttonSize = new Vector2(150f, 30f);
         var labelSize = 28f;
         var largeButtonSize = new Vector2(150f, 38f);
         var rightOffset = 360f;
+        var buttonOffset = 150f;
         var skipSize = 35f;
+        var titleSkipSize = 45f;
 
         var origAnchor = Text.Anchor;
         var origFont = Text.Font;
 
         Text.Anchor = TextAnchor.MiddleLeft;
         Text.Font = GameFont.Medium;
+        
 
-        Rect titleRect = new Rect(0, 0, inRect.width, 25f);
+        Rect fullWindowRect = new Rect(0f, 0f, 690f, 950f);//size of the inner settings window
+        Rect windowScrollRect = new Rect(0f, 0f, inRect.width - 8f, (inRect.height - largeButtonSize.y)-10);
+        Widgets.BeginScrollView(windowScrollRect, ref filterParams.windowScroll, fullWindowRect);
+
+        Rect titleRect = new Rect(0, 0, inRect.width, 40f);
         Widgets.Label(titleRect, "SeedFinder Settings");
 
         Text.Font = origFont;
-
-        var curY = 50f;
-        var buttonOffset = 150f;
+        
+        curY += titleSkipSize;
 
         // Seed prefix
         Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Screenshot Directory: ");
         filterParams.outDirectory = Widgets.TextField(new Rect(buttonOffset, curY, 300f, buttonSize.y), filterParams.outDirectory);
+        if (Widgets.ButtonText(new Rect(buttonOffset + 305f, curY, buttonSize.x - 25, buttonSize.y), "Open Folder")) {
+            Directory.CreateDirectory(filterParams.outDirectory);
+            Process.Start(@filterParams.outDirectory);
+        }
 
         curY += skipSize;
 
@@ -144,8 +156,7 @@ class FilterWindow : Verse.Window
 
         Text.Font = origFont;
 
-        curY += skipSize;
-        curY += 10f;
+        curY += titleSkipSize;
 
         buttonOffset = 135f;
         // Biome
@@ -312,8 +323,7 @@ class FilterWindow : Verse.Window
             }
 
         }
-        curY += skipSize;
-        curY += 10f;
+        curY += titleSkipSize;
 
         // Growing days
         Func<int, String> growingDaysToStr = (int growingDays) => {
@@ -391,7 +401,7 @@ class FilterWindow : Verse.Window
         curY += 10f;
 
         Widgets.Label(new Rect(0, curY, 350, labelSize), "Required Stone Types on Map (order doesn't matter)");
-        curY += skipSize;
+        curY += 25f;
 
         float totalStoneWidth = 0f;
         for (int idx = 0; idx < SeedFinderController.Instance.allStones.Count; idx++) {
@@ -402,10 +412,14 @@ class FilterWindow : Verse.Window
         }
 
         var stoneOffset = 30f;
-        Rect fullStoneRect = new Rect(30f, curY, totalStoneWidth, labelSize + 20f);
-        Rect scrollRect = new Rect(30f, curY, inRect.width - 10f, labelSize + 20f);
-        Widgets.ScrollHorizontal(scrollRect, ref filterParams.stoneScroll, fullStoneRect);
-        Widgets.BeginScrollView(scrollRect, ref filterParams.stoneScroll, fullStoneRect);
+        // if statement disables scrollView so it doesn't eat scrollwheel inputs when not needed
+        // (Tynan's version of scrollView doesn't include the override that disables the scrollwheel input)
+        if (totalStoneWidth > fullWindowRect.width) {
+            Rect fullStoneRect = new Rect(30f, curY, totalStoneWidth, labelSize);
+            Rect scrollRect = new Rect(30f, curY, fullWindowRect.width - 40f, labelSize + 16f);
+            Widgets.BeginScrollView(scrollRect, ref filterParams.stoneScroll, fullStoneRect);
+        }
+
         for (int idx = 0; idx < SeedFinderController.Instance.allStones.Count; idx++) {
             var stoneDef = SeedFinderController.Instance.allStones[idx];
             bool desired = filterParams.desiredStones[idx];
@@ -419,14 +433,18 @@ class FilterWindow : Verse.Window
             var numChars = stoneLabel.Length;
             stoneOffset += 50 + 7 * numChars;
         }
-        Widgets.EndScrollView();
+
+        if (totalStoneWidth > fullWindowRect.width)
+        {
+            Widgets.EndScrollView();
+        }
 
         curY += skipSize;
         curY += 10f;
 
         // Faction filters
         Widgets.Label(new Rect(0, curY, 350, labelSize), "Require Nearby Settlements: (within drop pod range)");
-        curY += skipSize;
+        curY += 25f;
 
         Widgets.CheckboxLabeled(new Rect(30, curY, 150, labelSize - 3), "Civil Outlander", ref filterParams.needCivilOutlanderNear, disabled: false, null, null, placeCheckboxNearText: true);
         Widgets.CheckboxLabeled(new Rect(180, curY, 150, labelSize - 3), "Rough Outlander", ref filterParams.needRoughOutlanderNear, disabled: false, null, null, placeCheckboxNearText: true);
@@ -447,8 +465,7 @@ class FilterWindow : Verse.Window
 
         Text.Font = origFont;
 
-        curY += skipSize;
-        curY += 10f;
+        curY += titleSkipSize;
 
         buttonOffset = 150f;
         // Planet Size
@@ -529,6 +546,11 @@ class FilterWindow : Verse.Window
 
             Find.WindowStack.Add(new FloatMenu(options));
         }
+
+        curY += skipSize;
+
+
+        Widgets.EndScrollView();
 
         // Submission button
         if (Widgets.ButtonText(new Rect(inRect.width / 2 - largeButtonSize.x / 2, inRect.height - largeButtonSize.y, largeButtonSize.x, largeButtonSize.y), "Search")) {
@@ -673,9 +695,10 @@ public class SeedFinderController : ModBase {
             filterParams.desiredStones.Add(false);
         }
 
-        filterParams.stoneScroll = new Vector2(0, 0);
+            filterParams.stoneScroll = new Vector2(0, 0);
+            filterParams.windowScroll = new Vector2(0, 0);
 
-        origAnimaSize = ThingDefOf.Plant_TreeAnima.graphicData.drawSize;
+            origAnimaSize = ThingDefOf.Plant_TreeAnima.graphicData.drawSize;
 
         foreach (var animaComp in ThingDefOf.Plant_TreeAnima.comps) {
             var meditationComp = animaComp as CompProperties_MeditationFocus;
