@@ -630,7 +630,9 @@ public class SeedFinderController : ModBase {
     internal void startFinding() {
         isSeedFinding = true;
 
-        ThingDefOf.Plant_TreeAnima.graphicData.drawSize *= 2.5f;
+        if (ModLister.RoyaltyInstalled) {
+            ThingDefOf.Plant_TreeAnima.graphicData.drawSize *= 2.5f;
+        }
 
         visitNextMap();
     }
@@ -638,7 +640,9 @@ public class SeedFinderController : ModBase {
     internal void stopFinding() {
         reset();
 
-        ThingDefOf.Plant_TreeAnima.graphicData.drawSize = origAnimaSize;
+        if (ModLister.RoyaltyInstalled) {
+            ThingDefOf.Plant_TreeAnima.graphicData.drawSize = origAnimaSize;
+        }
     }
 
     public override void Initialize() {
@@ -698,22 +702,24 @@ public class SeedFinderController : ModBase {
             filterParams.stoneScroll = new Vector2(0, 0);
             filterParams.windowScroll = new Vector2(0, 0);
 
+        if (ModLister.RoyaltyInstalled) {
             origAnimaSize = ThingDefOf.Plant_TreeAnima.graphicData.drawSize;
 
-        foreach (var animaComp in ThingDefOf.Plant_TreeAnima.comps) {
-            var meditationComp = animaComp as CompProperties_MeditationFocus;
-            if (meditationComp != null) {
-                foreach (var offset in meditationComp.offsets) {
-                    var radiusOffset = offset as FocusStrengthOffset_ArtificialBuildings;
-                    if (radiusOffset != null) {
-                        animaRadius = radiusOffset.radius;
-                        break;
+            foreach (var animaComp in ThingDefOf.Plant_TreeAnima.comps) {
+                var meditationComp = animaComp as CompProperties_MeditationFocus;
+                if (meditationComp != null) {
+                    foreach (var offset in meditationComp.offsets) {
+                        var radiusOffset = offset as FocusStrengthOffset_ArtificialBuildings;
+                        if (radiusOffset != null) {
+                            animaRadius = radiusOffset.radius;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (animaRadius != -1f) {
-                break;
+                if (animaRadius != -1f) {
+                    break;
+                }
             }
         }
     }
@@ -869,8 +875,10 @@ public class SeedFinderController : ModBase {
         yield return new WaitForFixedUpdate();
 
         if (filterParams.highlightPOI) {
-            foreach (var animaThing in Find.CurrentMap.listerThings.ThingsOfDef(ThingDefOf.Plant_TreeAnima)) {
-                GenDraw.DrawRadiusRing(animaThing.Position, animaRadius, MeditationUtility.ArtificialBuildingRingColor);
+            if (ModLister.RoyaltyInstalled) {
+                foreach (var animaThing in Find.CurrentMap.listerThings.ThingsOfDef(ThingDefOf.Plant_TreeAnima)) {
+                    GenDraw.DrawRadiusRing(animaThing.Position, animaRadius, MeditationUtility.ArtificialBuildingRingColor);
+                }
             }
 
             foreach (var geyser in map.listerBuildings.AllBuildingsNonColonistOfDef(ThingDefOf.SteamGeyser)) {
