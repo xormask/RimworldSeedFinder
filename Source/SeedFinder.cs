@@ -652,7 +652,7 @@ public class SeedFinderController : ModBase {
         filterParams.maxFound = 100;
         filterParams.clearFog = false;
         filterParams.highlightPOI = true;
-        filterParams.planetCoverage = 1f;
+        filterParams.planetCoverage = 0.3f;
         filterParams.rainfall = OverallRainfall.Normal;
         filterParams.temperature = OverallTemperature.Normal;
         filterParams.population = OverallPopulation.Normal;
@@ -762,8 +762,14 @@ public class SeedFinderController : ModBase {
 
         // Get rid of error spam from triggers trying to run after the map has been destroyed
         foreach (var thing in map.listerThings.AllThings.ToList()) {
-            if (thing.def == ThingDefOf.InsectJelly || thing.def == ThingDefOf.RectTrigger || thing.Faction == Faction.OfMechanoids ||
-                thing.Faction == Faction.OfInsects || thing.Faction == Faction.OfAncients || thing.Faction == Faction.OfAncientsHostile) {
+            if (thing.def == ThingDefOf.InsectJelly ||
+                thing.def == ThingDefOf.RectTrigger ||
+                thing.def == ThingDefOf.AncientCryptosleepCasket ||
+                thing.Faction == Faction.OfMechanoids ||
+                thing.Faction == Faction.OfInsects ||
+                thing.Faction == Faction.OfAncients ||
+                thing.Faction == Faction.OfAncientsHostile ||
+                thing.Faction == Faction.OfHoraxCult) {
                 if (thing.holdingOwner != null) {
                     thing.holdingOwner.Remove(thing);
                 }
@@ -806,6 +812,14 @@ public class SeedFinderController : ModBase {
 
             if (filterParams.clearFog) {
                 map.fogGrid.ClearAllFog();
+            } else {
+			    FloodFillerFog.FloodUnfog(MapGenerator.PlayerStartSpot, map);
+
+                List<IntVec3> rootsToUnfog = MapGenerator.rootsToUnfog;
+		        for (int i = 0; i < rootsToUnfog.Count; i++)
+		        {
+		        	FloodFillerFog.FloodUnfog(rootsToUnfog[i], map);
+		        }
             }
 
             float longitude = Find.WorldGrid.LongLatOf(map.Tile).x;

@@ -21,3 +21,6 @@ Version.cpp
 build.js
 nunit_random_seed.tmp
 *.DotSettings
+/Mods/SeedFinder/v1.5/Assemblies/System.dll
+/Mods/SeedFinder/v1.5/Assemblies/System.Core.dll
+/Mods/SeedFinder/v1.5/Assemblies/mscorlib.dll
