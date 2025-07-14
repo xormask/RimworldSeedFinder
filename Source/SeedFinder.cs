@@ -1034,17 +1034,49 @@ public class SeedFinderController : ModBase {
 
         var scenFaction = (ScenPart_PlayerFaction)ScenarioMaker.MakeScenPart(ScenPartDefOf.PlayerFaction);
         typeof(ScenPart_PlayerFaction).GetField("factionDef", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scenFaction, FactionDefOf.PlayerColony);
-        typeof(Scenario).GetField("playerFaction", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, scenFaction);
+        typeof(Scenario).GetField("playerFaction",
+            BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, scenFaction);
 
-        var pawnConfig = (ScenPart_ConfigPage_ConfigureStartingPawns)ScenarioMaker.MakeScenPart(ScenPartDefOf.ConfigPage_ConfigureStartingPawns);
+        var pawnConfig = (ScenPart_ConfigPage_ConfigureStartingPawns)ScenarioMaker.MakeScenPart(
+            ScenPartDefOf.ConfigPage_ConfigureStartingPawns);
         pawnConfig.pawnCount = 1;
         pawnConfig.pawnChoiceCount = 8;
 
         var scenParts = new List<ScenPart>();
+        typeof(Scenario).GetField("parts", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, scenParts);
 
         scenParts.Add(pawnConfig);
         scenParts.Add(ScenarioMaker.MakeScenPart(ScenPartDefOf.PlayerPawnsArriveMethod));
-        typeof(Scenario).GetField("parts", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, scenParts);
+
+		    var surfaceLayer = new ScenPart_PlanetLayer {
+		    	def = ScenPartDefOf.PlanetLayerFixed,
+		    	layer = PlanetLayerDefOf.Surface,
+		    	settingsDef = PlanetLayerSettingsDefOf.Surface,
+		    	hide = true,
+		    	tag = "Surface"
+		    };
+
+        typeof(Scenario).GetField("surfaceLayer",
+          BindingFlags.NonPublic | BindingFlags.Instance).SetValue(scen, surfaceLayer);
+        
+        if (ModsConfig.OdysseyActive) {
+        	ScenPart_PlanetLayer scenPart_PlanetLayer = new ScenPart_PlanetLayer {
+        		def = ScenPartDefOf.PlanetLayerFixed,
+        		layer = PlanetLayerDefOf.Orbit,
+        		settingsDef = PlanetLayerSettingsDefOf.Orbit,
+        		hide = true,
+        		tag = "Orbit"
+        	};
+        	scenParts.Add(scenPart_PlanetLayer);
+        	surfaceLayer.connections.Add(new LayerConnection {
+        		tag = scenPart_PlanetLayer.tag,
+        		zoomMode = LayerConnection.ZoomMode.ZoomOut
+        	});
+        	scenPart_PlanetLayer.connections.Add(new LayerConnection {
+        		tag = surfaceLayer.tag,
+        		zoomMode = LayerConnection.ZoomMode.ZoomIn
+        	});
+        }
 
         Current.Game.Scenario = scen;
 
