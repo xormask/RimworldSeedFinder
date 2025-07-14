@@ -45,6 +45,7 @@ class SeedFinderFilterParameters {
     public float planetCoverage;
     public OverallRainfall rainfall;
     public OverallTemperature temperature;
+    public LandmarkDensity landmarkDensity;
     public OverallPopulation population;
     public float pollution;
     public int mapSize;
@@ -510,6 +511,12 @@ class FilterWindow : Verse.Window
 
         curY += skipSize;
 
+        // Landmark Density
+        Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Landmarks: ");
+        filterParams.landmarkDensity = (LandmarkDensity)Mathf.RoundToInt(Widgets.HorizontalSlider(new Rect(buttonOffset, curY, sliderSize.x, sliderSize.y), (float)filterParams.landmarkDensity, 0f, LandmarkDensityUtility.EnumValuesCount - 1, middleAlignment: true, "PlanetLandmarkDensity_Normal".Translate(), "PlanetLandmarkDensity_Low".Translate(), "PlanetLandmarkDensity_High".Translate(), 1f));
+
+        curY += skipSize;
+
         // Population
         Widgets.Label(new Rect(0, curY, buttonOffset, labelSize), "Population: ");
         filterParams.population = (OverallPopulation)Mathf.RoundToInt(Widgets.HorizontalSlider(new Rect(buttonOffset, curY, sliderSize.x, sliderSize.y), (float)filterParams.population, 0f, OverallPopulationUtility.EnumValuesCount - 1, middleAlignment: true, "PlanetPopulation_Normal".Translate(), "PlanetPopulation_Low".Translate(), "PlanetPopulation_High".Translate(), 1f));
@@ -655,6 +662,7 @@ public class SeedFinderController : ModBase {
         filterParams.planetCoverage = 0.3f;
         filterParams.rainfall = OverallRainfall.Normal;
         filterParams.temperature = OverallTemperature.Normal;
+        filterParams.landmarkDensity = LandmarkDensity.Normal;
         filterParams.population = OverallPopulation.Normal;
         filterParams.pollution = (ModsConfig.BiotechActive ? 0.05f : 0f);
         filterParams.mapSize = 250;
@@ -741,7 +749,7 @@ public class SeedFinderController : ModBase {
 
         Find.MusicManagerPlay.ForceFadeoutAndSilenceFor(120f);
         
-        foreach (var pawn in PawnsFinder.AllMapsCaravansAndTravelingTransportPods_Alive_OfPlayerFaction.ToList()) {
+        foreach (var pawn in PawnsFinder.AllMapsCaravansAndTravellingTransporters_Alive_OfPlayerFaction) {
             pawn.inventory.DestroyAll();
             if (pawn.Spawned) {
                 pawn.DeSpawn();
@@ -1104,6 +1112,7 @@ public class SeedFinderController : ModBase {
                                                           filterParams.rainfall,
                                                           filterParams.temperature,
                                                           filterParams.population,
+                                                          filterParams.landmarkDensity,
                                                           filterParams.factions,
                                                           filterParams.pollution);
     }
@@ -1168,7 +1177,7 @@ public class SeedFinderController : ModBase {
                 continue;
             }
 
-            if (tile.biome != filterParams.biome || tile.hilliness != filterParams.hilliness) {
+            if (tile.PrimaryBiome != filterParams.biome || tile.hilliness != filterParams.hilliness) {
                 continue;
             }
 
@@ -1186,7 +1195,7 @@ public class SeedFinderController : ModBase {
                 if (filterParams.river == FeatureFilter.Present) {
                     if (!hasRiver) continue;
 
-                    var tileRiver = tile.Rivers.MaxBy((Tile.RiverLink riverlink) => riverlink.river.degradeThreshold).river;
+                    var tileRiver = tile.Rivers.MaxBy((SurfaceTile.RiverLink riverlink) => riverlink.river.degradeThreshold).river;
 
                     bool desiredRiverFound = false;
 
